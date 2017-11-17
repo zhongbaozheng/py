@@ -6,74 +6,86 @@
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
 import codecs
 import json
+import pymysql
+from weibo.items import TweetsItem, CommentItem, UserItem
 
-# json格式
-import MySQLdb
-from twisted.enterprise import adbapi
+con = pymysql.connect(
+    host = "192.168.13.110",
+    user = "root",
+    password = "1213",
+    db = "py",
+    charset = "utf8mb4"
+)
+
+cus = con.cursor()
 
 
-class WeiboJsonPipeline(object):
-    def __init__(self):
-        self.file = codecs.open("star.json","w",encoding="utf-8")
-    #pipeline默认调用的方法
-    def process_item(self, item, spider):
-        line = json.dumps(dict(item))+"\n"
-        self.file.write(line)
-        return item
-    def spider_closed(self):
-        self.file.close()
-
+# #文本jison格式的存储
+# class WeiboJsonPipeline(object):
+#     def __init__(self):
+#         self.file = codecs.open("star.json","w",encoding="utf-8")
+#     #pipeline默认调用的方法
+#     def process_item(self, item, spider):
+#         line = json.dumps(dict(item))+"\n"
+#         self.file.write(line)
+#         return item
+#     def spider_closed(self):
+#         self.file.close()
 
 
 #数据库存储
 class WeiboDataPipeline(object):
 
-    #初始化
-    def __init__(self,dbpool):
-        self.dbpool = dbpool
-        self.dbpool = adbapi.ConnectionPool(
-            'MySQLdb',
-            host='192.168.13.107',
-            db='crawlpicturesdb',
-            user='root',
-            passwd='1213',
-            cursorclass=MySQLdb.cursors.DictCursor,
-            charset='utf8',
-            use_unicode=False
-        )
-    # 静态的方法
-    @classmethod
-    def from_settings(cls,settings):
+    # _id = Field()  # 微博id = user_id+tweets_id
+    # user_id = Field()  # 作者id
+    # content = Field()  # 内容
+    # clike = Field()  # 点赞数
+    # ccomment = Field()  # 评论数
+    # ctransfer = Field()  # 转发数
+    # pub_time = Field()  # 创建时间
+    # master_id = Field()  # 隶属id 如果是转发微博
+    #
+    # t = Field()
+    def process_item(self, item, spider):
+        sql = None
+        value=None
+        if isinstance(item,TweetsItem):
+            sql = "insert into Tweets values(0,%s,%s,%s,%s,%s,%s,%s,%s)"
+            value = (
+                item['user_id'],
+                item['content'],
+                item['clike'],
+                item['gender'],
+                item['ccomment'],
+                item['ctransfer'],
+                item['pub_time'],
+                item['master_id']
+            )
+        elif isinstance(item,CommentItem):
+            sql = "insert into Comments values(0,%s,%s,%s,%s,%s,%s,%s)"
+            value = (
+                item['_id'],
+                item['author_id'],
+                item['water_name'],
+                item['master_id'],
+                item['reply_nickname'],
+                item['content'],
+                item['clike']
+            )
+        elif isinstance(item, UserItem):
+            sql = "insert into Users values(0,%s,%s,%s,%s,%s,%s)"
+            value = (
+                item['_id'],
+                item['cfollows'],
+                item['cfans'],
+                item['ctweets'],
+                item['auth'],
+                item['intro']
+            )
 
-        dbparams=dict(
-            host = settings["MYSQL_HOST"],
-            db=settings['MYSQL_DBNAME'],
-            user=settings['MYSQL_USER'],
-            passwd=settings['MYSQL_PASSWD'],
-            charset='utf8',  # 编码要加上，否则可能出现中文乱码问题
-            cursorclass=MySQLdb.cursors.DictCursor,
-            use_unicode=False,
-
-        )
-        dbpool = adbapi.ConnectionPool("MySQLdb",**dbparams)
-        return cls(dbpool)
-
-    # pipeline默认调用的方法
-    def process_item(self,item,spider):
-        query = self.dbpool.runInteraction(self.__conditonal_insert,item)
-        query.addErrback(self._handle_error,item,spider)
-        return item
-
-
-    # 插入数据，私有化
-    def __conditonal_insert(self,tx,item):
-
-        sql = "insert into %s(......) values(%s,%s....)"
-        params = (item["x"],item["y"])
-        tx.execute(sql,params)
-
-    #错误处理
-    def _handle_error(self,failure,item,spider):
-        print("-----database operate exception------")
-        print("-------------------------------------")
-        print(failure)
+        try:
+            cus.execute(sql,value)
+            con.commit()
+        except Exception as why:
+            print(why)
+            con.rollback()

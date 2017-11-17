@@ -1,3 +1,12 @@
+#!/usr/bin/python
+# coding: utf-8
+
+"""
+    Author: ztt
+    Email: qq282699766@gmail.com
+    Date created: 2017/1/15
+"""
+
 # encoding=utf-8
 
 agents = [

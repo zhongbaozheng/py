@@ -1,256 +1,191 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-
-import os
+import random
 import re
-import requests
-import sys
-import traceback
-from datetime import datetime
-from datetime import timedelta
-from lxml import etree
+import time
+import json
+from scrapy.http import Request
+from scrapy import Selector
+from scrapy.spiders import CrawlSpider
+
+from weibo.cookies_phone import cookies
+from ..settings import bigV
+from ..items import TweetsItem, UserItem, CompleteItem, CommentItem
 
 
-class Weibo:#传递
-    cookie = {"Cookie": "ALF=1513329787; SCF=AmLWIv5jJs0XxG6TLtWnlqhOzppliy5YaiH99hvIERlpOMMCUQ7axd2dCIiZE5HYcIwZxv0ROAPdVpirgO9PRZU.; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WF0A5JjAK2WKBXrfSKM0.G15JpX5KMhUgL.Foq0SK5ReoME1h22dJLoI7DlMJLrIg4Idc4L; _T_WM=ec623811168738e4219e7e338cc77371; __guid=52195957.2026928639521443300.1510738592601.2925; SUB=_2A253CJiEDeRhGeVJ4lcS9CbOzzuIHXVU8jjMrDV6PUJbkdBeLRjckW0lQTqOvdXF8wpqhxQ34nD36u7E_w..; SUHB=0laF59XsYBmRHO; SSOLoginState=1510795476; monitor_count=4; M_WEIBOCN_PARAMS=featurecode%3D20000320%26lfid%3Dhotword%26luicode%3D20000174%26uicode%3D20000174%26fid%3Dhotword"}  # 将your cookie替换成自己的cookie
+def get_rnd_cookie():
+	return json.loads(random.choice(cookies))
 
-    # Weibo类初始化
-    def __init__(self, user_id, filter=0):
-        self.user_id = user_id  # 用户id，即需要我们输入的数字，如昵称为“Dear-迪丽热巴”的id为1669879400
-        self.filter = filter  # 取值范围为0、1，程序默认值为0，代表要爬取用户的全部微博，1代表只爬取用户的原创微博
-        self.username = ''  # 用户名，如“Dear-迪丽热巴”
-        self.weibo_num = 0  # 用户全部微博数
-        self.weibo_num2 = 0  # 爬取到的微博数
-        self.following = 0  # 用户关注数
-        self.followers = 0  # 用户粉丝数
-        self.weibo_content = []  # 微博内容
-        self.publish_time = []  # 微博发布时间
-        self.up_num = []  # 微博对应的点赞数
-        self.retweet_num = []  # 微博对应的转发数
-        self.comment_num = []  # 微博对应的评论数
 
-    # 获取用户昵称
-    def get_username(self):
-        try:
-            url = "https://weibo.cn/%d/info" % (self.user_id)
-            html = requests.get(url, cookies=self.cookie).content
-            selector = etree.HTML(html)
-            username = selector.xpath("//title/text()")[0]
-            print("username=%s" % username)
-            self.username = username[:-3]
-            print (u"用户名: " + self.username)
-        except Exception as e:
-            print ("Error: ", e)
-            traceback.print_exc()
+class Spider(CrawlSpider):
+    name = "weibo"
+    host = "http://weibo.cn"
+    start_user_id = bigV
+    scrawl_ID = set(start_user_id)  # 记录待爬的用户ID
+    finish_ID = set()  # 记录已爬的用户ID
 
-    # 获取用户微博数、关注数、粉丝数
-    def get_user_info(self):
-        try:
-            # https: // weibo.com / p / 1004061195242865 / home?from=page_100406_profile & wvr = 6 & mod = data & is_all = 1  # place
-            url = "https://weibo.cn/u/%d?filter=%d&page=1" % (
-                self.user_id, self.filter)
-            html = requests.get(url, cookies=self.cookie).content
-            selector = etree.HTML(html)
-            pattern = r"\d+\.?\d*"
+    def start_requests(self):
+        while self.scrawl_ID.__len__():
+            user_id = self.scrawl_ID.pop()
+            self.finish_ID.add(user_id)  # 加入已爬队列
+            user_id = str(user_id)
 
-            # 微博数
-            str_wb = selector.xpath(
-                "//div[@class='tip2']/span[@class='tc']/text()")[0]
-            print("str_wb = %s" %str_wb)
-            guid = re.findall(pattern, str_wb, re.S | re.M)
-            for value in guid:
-                num_wb = int(value)
-                break
-            self.weibo_num = num_wb
-            print (u"微博数: " + str(self.weibo_num))
+            url_tweets = "http://weibo.cn/%s/profile?filter=0&page=1" % user_id  # filter 0所有 1原创
+            url_information0 = "http://weibo.cn/attgroup/opening?uid=%s" % user_id
+            # for x in ['url', 'method', 'headers', 'body', 'cookies', 'meta',
+            #           'encoding', 'priority', 'dont_filter', 'callback', 'errback']:
+            yield Request(url=url_information0,cookies=get_rnd_cookie(),meta={"user_id": user_id},callback=self.parse_user_0)  # 去爬个人信息
+            yield Request(url=url_tweets,cookies=get_rnd_cookie(),meta={"user_id": user_id},callback=self.parse_tweets)  # 去爬微博
 
-            # 关注数
-            str_gz = selector.xpath("//div[@class='tip2']/a/text()")[0]
-            guid = re.findall(pattern, str_gz, re.M)
-            self.following = int(guid[0])
-            print (u"关注数: " + str(self.following))
+    def parse_user_0(self, response):
+        """ 抓取个人信息-第一部分：微博数、关注数、粉丝数 """
+        print("cookie=%s", cookies)
+        user_item = UserItem()
+        # selector = Selector(response)
+        text0 = response.selector.xpath('//div[@class="u"]/div[@class="tip2"]').extract_first()
+        print("text=%s" % text0)
+        if text0:
+            num_tweets = re.findall(u'\u5fae\u535a\[(\d+)\]', text0)  # 微博数
+            num_follows = re.findall(u'\u5173\u6ce8\[(\d+)\]', text0)  # 关注数
+            num_fans = re.findall(u'\u7c89\u4e1d\[(\d+)\]', text0)  # 粉丝数
+            if num_tweets:
+                user_item["ctweets"] = int(num_tweets[0])
+            if num_follows:
+                user_item["cfollows"] = int(num_follows[0])
+            if num_fans:
+                user_item["cfans"] = int(num_fans[0])
+            user_item["_id"] = response.meta["user_id"]
+            url_information1 = "http://weibo.cn/%s/info" % response.meta["user_id"]
+            yield Request(url=url_information1, meta={"item": user_item}, callback=self.parse_user_1, cookies=get_rnd_cookie())
 
-            # 粉丝数
+    def parse_user_1(self, response):
+        """ 抓取个人信息2 """
+        user_item = response.meta["item"]
+        selector = Selector(response)
+        text1 = ";".join(selector.xpath('body/div[@class="c"]/text()').extract())  # 获取标签里的所有text()
 
-            str_fs = selector.xpath("//div[@class='tip2']/a/text()")[1]
-            guid = re.findall(pattern, str_fs, re.M)
-            self.followers = int(guid[0])
-            print (u"粉丝数: " + str(self.followers))
+        nickname = re.findall(u'\u6635\u79f0[:|\uff1a](.*?);', text1)  # 昵称
+        intro = re.findall(u'\u7b80\u4ecb[:|\uff1a](.*?);', text1)  # 简介
+        auth = re.findall(u'\u8ba4\u8bc1[:|\uff1a](.*?);', text1)  # 认证信息
 
-        except Exception as e:
-            print ("Error: ", e)
-            traceback.print_exc()
+        gender = re.findall(u'\u6027\u522b[:|\uff1a](.*?);', text1)  # 性别
+        place = re.findall(u'\u5730\u533a[:|\uff1a](.*?);', text1)  # 地区（包括省份和城市）
+        birthday = re.findall(u'\u751f\u65e5[:|\uff1a](.*?);', text1)  # 生日
+        sexorientation = re.findall(u'\u6027\u53d6\u5411[:|\uff1a](.*?);', text1)  # 性取向
+        marriage = re.findall(u'\u611f\u60c5\u72b6\u51b5[:|\uff1a](.*?);', text1)  # 婚姻状况
+        url = re.findall(u'\u4e92\u8054\u7f51[:|\uff1a](.*?);', text1)  # 首页链接
 
-    # 获取用户微博内容及对应的发布时间、点赞数、转发数、评论数
-    def get_weibo_info(self):
-        try:
-            url = "https://weibo.cn/u/%d?filter=%d&page=1" % (
-                self.user_id, self.filter)
-            html = requests.get(url, cookies=self.cookie).content
-            selector = etree.HTML(html)
-            if selector.xpath("//input[@name='mp']") == []:
-                page_num = 1
+        if nickname:
+            user_item["nickname"] = nickname[0]
+        if auth:
+            user_item["auth"] = auth[0]
+        if intro:
+            user_item["intro"] = intro[0]
+        user_item['t'] = time.strftime('%Y-%m-%d', time.localtime(time.time()))
+        yield user_item
+
+    def parse_tweets(self, response):
+        """ 抓取微博数据 """
+        selector = Selector(response)
+        tweets = selector.xpath('body/div[@class="c" and @id]')
+        for tweet in tweets:
+            tweets_item = TweetsItem()
+            tweets_id = tweet.xpath('@id').extract_first()  # 微博ID
+            content = tweet.xpath('div/span[@class="ctt"]/text()').extract_first()  # 微博内容
+            clike = re.findall(u'\u8d5e\[(\d+)\]', tweet.extract())  # 点赞数
+            ctransfer = re.findall(u'\u8f6c\u53d1\[(\d+)\]', tweet.extract())  # 转载数
+            ccomment = re.findall(u'\u8bc4\u8bba\[(\d+)\]', tweet.extract())  # 评论数
+            master = re.findall(u'\u539f\u6587\u8f6c\u53d1(.*?)\u539f\u6587\u8bc4\u8bba', tweet.extract())  # 提取转发信息
+            reason = re.findall(u'\u8f6c\u53d1\u7406\u7531:</span>(.*?)\u8d5e', tweet.extract())  # 转发理由
+            others = tweet.xpath('div/span[@class="ct"]/text()').extract_first()  # 求时间和使用工具（手机或平台）
+            comment_raw = re.findall(u'repost(.*?)fav', tweet.extract())  # 提取转发信息
+            comment__url = re.findall(u'<a href="(.*?)" class="cc">\u8bc4\u8bba', comment_raw[0])[0]  # 评论准备
+            comment_count = re.findall(u'">\u8bc4\u8bba\[(.*?)]</a>', comment_raw[0])[0]
+
+            cooridinates = tweet.xpath('div/a/@href').extract_first()  # 定位坐标
+
+            tweets_item["_id"] = tweets_id
+            tweets_item["user_id"] = response.meta["user_id"]
+            if clike:
+                tweets_item["clike"] = int(clike[0])
+            if ctransfer:
+                tweets_item["ctransfer"] = int(ctransfer[0])
+            if ccomment:
+                tweets_item["ccomment"] = int(ccomment[0])
+            if master:
+                tweets_item["master_id"] = 'M_%s' % master[0].split('comment/')[1].split('?')[0]
+                if reason:
+                    reason = reason[0].split('//')[0].strip()
+                    if reason.endswith('<a href="http:'):
+                        reason = reason[:-14].strip()
+                    tweets_item["content"] = reason
             else:
-                page_num = (int)(selector.xpath(
-                    "//input[@name='mp']")[0].attrib["value"])
-            pattern = r"\d+\.?\d*"
-            for page in range(1, page_num + 1):
-                url2 = "https://weibo.cn/u/%d?filter=%d&page=%d" % (
-                    self.user_id, self.filter, page)
-                html2 = requests.get(url2, cookies=self.cookie).content
-                selector2 = etree.HTML(html2)
-                info = selector2.xpath("//div[@class='c']")
-                if len(info) > 3:
-                    for i in range(0, len(info) - 2):
-                        # 微博内容
-                        str_t = info[i].xpath("div/span[@class='ctt']")
-                        weibo_content = str_t[0].xpath("string(.)").encode(
-                            sys.stdout.encoding, "ignore").decode(
-                            sys.stdout.encoding)
-                        self.weibo_content.append(weibo_content)
-                        print (u"微博内容：" + weibo_content)
+                if content:
+                    tweets_item["content"] = content.strip(u"[\u4f4d\u7f6e]")  # 去掉最后的"[位置]"
+            if others:
+                others = others.split(u"\u6765\u81ea")
+                tweets_item["pub_time"] = others[0]
+            tweets_item['t'] = time.strftime('%Y-%m-%d', time.localtime(time.time()))
+            yield tweets_item
 
-                        # 微博发布时间
-                        str_time = info[i].xpath("div/span[@class='ct']")
-                        str_time = str_time[0].xpath("string(.)").encode(
-                            sys.stdout.encoding, "ignore").decode(
-                            sys.stdout.encoding)
-                        publish_time = str_time.split(u'来自')[0]
-                        if u"刚刚" in publish_time:
-                            publish_time = datetime.now().strftime(
-                                '%Y-%m-%d %H:%M')
-                        elif u"分钟" in publish_time:
-                            minute = publish_time[:publish_time.find(u"分钟")]
-                            minute = timedelta(minutes=int(minute))
-                            publish_time = (
-                                datetime.now() - minute).strftime(
-                                "%Y-%m-%d %H:%M")
-                        elif u"今天" in publish_time:
-                            today = datetime.now().strftime("%Y-%m-%d")
-                            time = publish_time[3:]
-                            publish_time = today + " " + time
-                        elif u"月" in publish_time:
-                            year = datetime.now().strftime("%Y")
-                            month = publish_time[0:2]
-                            day = publish_time[3:5]
-                            time = publish_time[7:12]
-                            publish_time = (
-                                year + "-" + month + "-" + day + " " + time)
-                        else:
-                            publish_time = publish_time[:16]
-                        self.publish_time.append(publish_time)
-                        print (u"微博发布时间：" + publish_time)
+            if int(comment_count) != 0:
+                yield Request(comment__url, meta={"master_id": tweets_id}, callback=self.parse_comment, cookies=get_rnd_cookie())
+                hot_comment_url = 'http://weibo.cn/comment/hot/%s?rl=2' % tweets_id.strip('M_')
+                yield Request(hot_comment_url, meta={"master_id": tweets_id}, callback=self.parse_comment, cookies=get_rnd_cookie())
 
-                        # 点赞数
-                        str_zan = info[i].xpath("div/a/text()")[-4]
-                        guid = re.findall(pattern, str_zan, re.M)
-                        up_num = int(guid[0])
-                        self.up_num.append(up_num)
-                        print (u"点赞数: " + str(up_num))
+        url_next = selector.xpath(
+            u'body/div[@id="pagelist"]/form/div/a[text()="\u4e0b\u9875"]/@href').extract()
+        if url_next:
+            yield Request(url=self.host + url_next[0],
+                          meta={"user_id": response.meta["user_id"]},
+                          callback=self.parse_tweets, cookies=get_rnd_cookie())
+        else:
+            complete_item = CompleteItem()
+            complete_item["_id"] = response.meta["user_id"]
+            complete_item['t'] = time.strftime('%Y-%m-%d', time.localtime(time.time()))
+            yield complete_item
 
-                        # 转发数
-                        retweet = info[i].xpath("div/a/text()")[-3]
-                        guid = re.findall(pattern, retweet, re.M)
-                        retweet_num = int(guid[0])
-                        self.retweet_num.append(retweet_num)
-                        print (u"转发数: " + str(retweet_num))
+    def parse_comment(self, response):
+        master_id = response.meta["master_id"]  # master_id
+        selector = Selector(response)
+        comments = selector.xpath('body/div[@class="c" and @id]')
+        for comment in comments:
+            comment_id = comment.xpath('@id').extract_first()  # comment_id
+            if comment_id == 'M_':
+                continue
+            water_name = comment.xpath('a/@href').extract_first().strip('/u/')  # auth_water_name
+            auth_id = re.findall(u'fuid=(.*?)&type', comment.xpath('a/@href').extract()[1])[0]  # auth_id
+            clike = re.findall(u'\u8d5e\[(\d+)\]', comment.extract())  # 点赞数  [u'1']
+            content = comment.xpath('span[@class="ctt"]')  # 内容，回复对象
+            text = content.xpath('text()').extract()
 
-                        # 评论数
-                        comment = info[i].xpath("div/a/text()")[-2]
-                        guid = re.findall(pattern, comment, re.M)
-                        comment_num = int(guid[0])
-                        self.comment_num.append(comment_num)
-                        print (u"评论数: " + str(comment_num))
+            if auth_id not in self.finish_ID:  # 新的ID，如果未爬则加入待爬队列
+                self.scrawl_ID.add(auth_id)
 
-                        self.weibo_num2 += 1
-
-            if not self.filter:
-                print (u"共" + str(self.weibo_num2) + u"条微博")
+            comment_item = CommentItem()
+            comment_item['_id'] = comment_id
+            comment_item['author_id'] = auth_id
+            comment_item['water_name'] = water_name
+            comment_item['master_id'] = master_id
+            if clike:
+                comment_item['clike'] = int(clike[0])
+            if len(text) == 2:
+                comment_item['content'] = text[1].strip(':')
+                comment_item['reply_nickname'] = content.xpath('a/text()').extract_first().strip('@')
             else:
-                print (u"共" + str(self.weibo_num) + u"条微博，其中" +
-                       str(self.weibo_num2) + u"条为原创微博"
-                       )
-        except Exception as e:
-            print ("Error: ", e)
-            traceback.print_exc()
+                comment_item['content'] = text[0]
 
-    # 将爬取的信息写入文件
-    def write_txt(self):
-        try:
-            file_dir = os.path.split(os.path.realpath(__file__))[
-                           0] + os.sep + "weibo"
-            if not os.path.isdir(file_dir):
-                os.mkdir(file_dir)
-            file_path = file_dir + os.sep + "%d" % self.user_id + ".txt"
-            f = open(file_path, "wb")
+            comment_item['t'] = time.strftime('%Y-%m-%d', time.localtime(time.time()))
+            yield comment_item
+        url_next = selector.xpath(
+            u'body/div[@id="pagelist"]/form/div/a[text()="\u4e0b\u9875"]/@href').extract()
 
-            if self.filter:
-                result_header = u"\n\n原创微博内容：\n"
-            else:
-                result_header = u"\n\n微博内容：\n"
-            result = (u"用户信息\n用户昵称：" + self.username +
-                      u"\n用户id：" + str(self.user_id) +
-                      u"\n微博数：" + str(self.weibo_num) +
-                      u"\n关注数：" + str(self.following) +
-                      u"\n粉丝数：" + str(self.followers) +
-                      result_header
-                      )
-            f.write(result.encode(sys.stdout.encoding))
-            for i in range(1, self.weibo_num2 + 1):
-                text = (str(i) + ":" + self.weibo_content[i - 1] + "\n" +
-                        u"发布时间：" + self.publish_time[i - 1] + "\n" +
-                        u"点赞数：" + str(self.up_num[i - 1]) +
-                        u"	 转发数：" + str(self.retweet_num[i - 1]) +
-                        u"	 评论数：" + str(self.comment_num[i - 1]) + "\n\n"
-                        )
-                f.write(text.encode(sys.stdout.encoding))
-                # result = result + text
-            # file_dir = os.path.split(os.path.realpath(__file__))[
-            #     0] + os.sep + "weibo"
-            # if not os.path.isdir(file_dir):
-            #     os.mkdir(file_dir)
-            # file_path = file_dir + os.sep + "%d" % self.user_id + ".txt"
-            # f = open(file_path, "wb")
-            # f.write(result.encode(sys.stdout.encoding))
-            f.close()
-            print (u"微博写入文件完毕，保存路径:" + file_path)
-        except Exception as e:
-            print("Error: ", e)
-            traceback.print_exc()
-
-    # 运行爬虫
-    def start(self):
-        try:
-            self.get_username()
-            self.get_user_info()
-            self.get_weibo_info()
-            self.write_txt()
-            print (u"信息抓取完毕")
-            print ("===========================================================================")
-        except Exception as  e:
-            print ("Error: ", e)
-
-
-def main():
-    try:
-        # 使用实例,输入一个用户id，所有信息都会存储在wb实例中
-        user_id = 1195242865  # 可以改成任意合法的用户id（爬虫的微博id除外）
-        filter = 0  # 值为0表示爬取全部微博（原创微博+转发微博），值为1表示只爬取原创微博
-        wb = Weibo(user_id, filter)  # 调用Weibo类，创建微博实例wb
-        wb.start()  # 爬取微博信息
-        print (u"用户名：" + wb.username)
-        print (u"全部微博数：" + str(wb.weibo_num))
-        print (u"关注数：" + str(wb.following))
-        print (u"粉丝数：" + str(wb.followers))
-        # print (u"最新一条原创微博为：" + wb.weibo_content[0])
-        # print (u"最新一条原创微博发布时间：" + wb.publish_time[0])
-        # print (u"最新一条原创微博获得的点赞数：" + str(wb.up_num[0]))
-        # print (u"最新一条原创微博获得的转发数：" + str(wb.retweet_num[0]))
-        # print (u"最新一条原创微博获得的评论数：" + str(wb.comment_num[0]))
-    except Exception as e:
-        print ("Error: ", e)
-        traceback.print_exc()
-
-
-if __name__ == "__main__":
-    main()
+        if url_next:
+            yield Request(url=self.host + url_next[0],
+                          meta={"master_id": master_id},
+                          callback=self.parse_comment, cookies=get_rnd_cookie())
+        else:
+            complete_item = CompleteItem()
+            complete_item["_id"] = master_id
+            complete_item['t'] = time.strftime('%Y-%m-%d', time.localtime(time.time()))
+            yield complete_item

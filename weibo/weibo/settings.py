@@ -1,25 +1,80 @@
 # -*- coding: utf-8 -*-
 
-# Scrapy settings for weibo project
-#
-# For simplicity, this file contains only settings considered important or
-# commonly used. You can find more settings consulting the documentation:
-#
-#     http://doc.scrapy.org/en/latest/topics/settings.html
-#     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
-#     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
-
+# 爬虫基本属性
 BOT_NAME = 'weibo'
-
 SPIDER_MODULES = ['weibo.spiders']
 NEWSPIDER_MODULE = 'weibo.spiders'
 
+# LOG_LEVEL = 'INFO'    # 日志级别
+# LOG_FILE = 'weiboSpider.log'  # 存在该设置则输出到该文件中，否则输出至标准错误输出
 
-# Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'weibo (+http://www.yourdomain.com)'
+# 大V
+bigV = [
+    1826792401, 3937348351, 5548590926, 1896891963,
+    1323527941, 1618051664, 1326410461, 2607072084, 2108172317,
+]
 
-# Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+
+# # 微博账号密码
+# myWeiBo = [
+#     ('17722173610', 'qsy9tugw '),
+#     ('17722177843', 'k2pccrfd '),
+#     ('17722176697', '1mqinzch '),
+#     ('17722179551', '8ccldtib '),
+#     ('17722179884', 'vay0xhsif '),
+#     ('17722177707', 'b4oamnmr '),
+#     ('bajiao26341950@163.com', 'tttt5555'),
+#     ('pinjian80@163.com', 'tttt5555'),
+#     ('huangzhimeifent@163.com', 'tttt5555'),
+#     ('pintuo17339719@163.com', 'tttt5555'),
+#     ('weizongchensipu@163.com', 'tttt5555'),
+#     ('liaogua68@163.com', 'tttt5555'),
+#     ('15164279524', 'Q474312827'),
+#     ('17131031514', 'Q474312827'),
+#     ('18445714564', 'Q474312827'),
+# ]
+
+
+
+# 爬虫中间件注册
+DOWNLOADER_MIDDLEWARES = {
+    "weibo.middlewares.UserAgentMiddleware": 401,
+    "weibo.middlewares.CookiesMiddleware": 402,
+}
+
+
+# 爬虫管道注册
+ITEM_PIPELINES = {
+    'weibo.pipelines.WeiboDataPipeline': 300,
+    # 'weibo.pipelines.WeiboJsonPipeline': 300,
+}
+
+
+HTTPERROR_ALLOWED_CODES=[302]
+
+
+# 注释掉，改为深度优先
+# 最大深度为3，广度优先。
+# DEPTH_PRIORITY = 3
+# SCHEDULER_DISK_QUEUE = 'scrapy.squeue.PickleFifoDiskQueue'
+# SCHEDULER_MEMORY_QUEUE = 'scrapy.squeue.FifoMemoryQueue'
+
+
+# 页面下载时间间隔  3秒间隔
+DOWNLOAD_DELAY = 3
+
+# 是否跳转至新页面
+REDIRECT_ENABLED = False
+
+# CONCURRENT_ITEMS = 1000
+# CONCURRENT_REQUESTS = 100
+# REDIRECT_ENABLED = False
+# CONCURRENT_REQUESTS_PER_DOMAIN = 100
+# CONCURRENT_REQUESTS_PER_IP = 0
+# CONCURRENT_REQUESTS_PER_SPIDER=100
+# DNSCACHE_ENABLED = True
+# CONCURRENT_REQUESTS = 70
+
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
@@ -47,13 +102,13 @@ ROBOTSTXT_OBEY = True
 # Enable or disable spider middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    'weibo.middlewares.WeiboSpiderMiddleware': 543,
+#    'weibo_spider.middlewares.WeiboSpiderSpiderMiddleware': 543,
 #}
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    'weibo.middlewares.MyCustomDownloaderMiddleware': 543,
+#    'weibo_spider.middlewares.MyCustomDownloaderMiddleware': 543,
 #}
 
 # Enable or disable extensions
@@ -65,7 +120,7 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 #ITEM_PIPELINES = {
-#    'weibo.pipelines.WeiboPipeline': 300,
+#    'weibo_spider.pipelines.SomePipeline': 300,
 #}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -88,10 +143,3 @@ ROBOTSTXT_OBEY = True
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
-
-#Mysql数据库的配置信息
-MYSQL_HOST = '192.168.13.107'
-MYSQL_DBNAME = 'crawlpicturesdb'         #数据库名字，请修改
-MYSQL_USER = 'root'             #数据库账号，请修改
-MYSQL_PASSWD = '1213'         #数据库密码，请修改
-MYSQL_PORT = 3306               #数据库端口，在dbhelper中使用
