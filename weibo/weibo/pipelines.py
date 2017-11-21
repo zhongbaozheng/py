@@ -7,7 +7,8 @@
 import codecs
 import json
 import pymysql
-from weibo.items import TweetsItem, CommentItem, UserItem
+
+from weibo.items import WeiboItem
 
 con = pymysql.connect(
     host = "192.168.13.110",
@@ -33,58 +34,55 @@ cus = con.cursor()
 #         self.file.close()
 
 
-#数据库存储
+# filter = Field()
+# username = Field()
+# weibo_num = Field()
+# following = Field()
+# followers = Field()
+# weibo_content = Field()
+# publish_time = Field()
+# up_num = Field()
+# retweet_num = Field()
+# comment_num = Field()
+
+
+#MYSQL数据库存储
 class WeiboDataPipeline(object):
 
-    # _id = Field()  # 微博id = user_id+tweets_id
-    # user_id = Field()  # 作者id
-    # content = Field()  # 内容
-    # clike = Field()  # 点赞数
-    # ccomment = Field()  # 评论数
-    # ctransfer = Field()  # 转发数
-    # pub_time = Field()  # 创建时间
-    # master_id = Field()  # 隶属id 如果是转发微博
-    #
-    # t = Field()
     def process_item(self, item, spider):
-        sql = None
-        value=None
-        if isinstance(item,TweetsItem):
-            sql = "insert into Tweets values(0,%s,%s,%s,%s,%s,%s,%s,%s)"
+        print("A")
+        if isinstance(item,WeiboItem):
+            print("B")
+            sql = "insert into "+item['username']+" values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
             value = (
-                item['user_id'],
-                item['content'],
-                item['clike'],
-                item['gender'],
-                item['ccomment'],
-                item['ctransfer'],
-                item['pub_time'],
-                item['master_id']
-            )
-        elif isinstance(item,CommentItem):
-            sql = "insert into Comments values(0,%s,%s,%s,%s,%s,%s,%s)"
-            value = (
-                item['_id'],
-                item['author_id'],
-                item['water_name'],
-                item['master_id'],
-                item['reply_nickname'],
-                item['content'],
-                item['clike']
-            )
-        elif isinstance(item, UserItem):
-            sql = "insert into Users values(0,%s,%s,%s,%s,%s,%s)"
-            value = (
-                item['_id'],
-                item['cfollows'],
-                item['cfans'],
-                item['ctweets'],
-                item['auth'],
-                item['intro']
+                item['filter'],
+                item['username'],
+                item['weibo_num'],
+                item['following'],
+                item['followers'],
+                item['weibo_content'],
+                item['publish_time'],
+                item['up_num'],
+                item['retweet_num'],
+                item['comment_num']
             )
 
         try:
+            print("C")
+            cus.execute("drop table if EXISTS "+item['username'])
+            cus.execute('create table '+item['username']+
+                        '个人信息(id int primary,'
+                        +item['username']+' varchar(256),'
+                        +item['filter']+' varchar(256),'
+                        +item['following']+' varchar(256),'
+                        +item['followers']+' varchar(256),'
+                        +item['weibo_content']+' text,'
+                        +item['publish_time']+' varchar(256),'
+                        +item['up_num']+' varchar(256),'
+                        +item['retweet_num']+' varchar(256),'
+                        +item['comment_num']+' varchar(256))'")                                                                                            "")")
             cus.execute(sql,value)
+            print("D")
             con.commit()
         except Exception as why:
             print(why)

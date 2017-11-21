@@ -41,7 +41,8 @@ def get_cookie(account, password):
     r = session.post(login_url, data=formdata, headers=headers)
     if r.status_code == 200:
         logger.warning('Succeed to get cookie of account(%s).' % account)
-        return json.dumps(r.cookies.get_dict())
+        # return json.dumps(r.cookies.get_dict())
+        return r.cookies.get_dict()
     else:
         logger.warning('Failed to get cookie of account(%s).Status_code:%d.' % (account, r.status_code))
         return None
@@ -58,11 +59,3 @@ def get_Cookies(Accounts):
 
 cookies = get_Cookies(MyAccounts)
 logger.warning('Finished to get cookies. Num:%d.' % len(cookies))
-    
-
-    
-    
-    
-    
-
-    

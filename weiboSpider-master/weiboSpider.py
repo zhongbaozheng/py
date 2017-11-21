@@ -12,7 +12,9 @@ from lxml import etree
 
 
 class Weibo:#传递
-    cookie = {"Cookie": "ALF=1513329787; SCF=AmLWIv5jJs0XxG6TLtWnlqhOzppliy5YaiH99hvIERlpOMMCUQ7axd2dCIiZE5HYcIwZxv0ROAPdVpirgO9PRZU.; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WF0A5JjAK2WKBXrfSKM0.G15JpX5KMhUgL.Foq0SK5ReoME1h22dJLoI7DlMJLrIg4Idc4L; _T_WM=ec623811168738e4219e7e338cc77371; __guid=52195957.2026928639521443300.1510738592601.2925; SUB=_2A253CJiEDeRhGeVJ4lcS9CbOzzuIHXVU8jjMrDV6PUJbkdBeLRjckW0lQTqOvdXF8wpqhxQ34nD36u7E_w..; SUHB=0laF59XsYBmRHO; SSOLoginState=1510795476; monitor_count=4; M_WEIBOCN_PARAMS=featurecode%3D20000320%26lfid%3Dhotword%26luicode%3D20000174%26uicode%3D20000174%26fid%3Dhotword"}  # 将your cookie替换成自己的cookie
+    cookie = {"Cookie":
+                  "_T_WM=7fbfd95aa90f5d19c186e84dcb3ec630; __guid=78840338.2974098575731180000.1511138140845.0083; SUB=_2A253FlM-DeThGeNH7FYS-SrOzDqIHXVU-X12rDV6PUJbkdBeLWP9kW19DybXxlrtMIGcq76FbC5x9UU-yQ..; SUHB=0id7XM0AJ33skl; SCF=AnnhwvV-vOOSwofU2YKrdCrjdEwgSKK262xLxJEntvIVYXWFZcajauYxlqHlwArutW91bKbDuVZ9TNL9ZJaTRx4.; SSOLoginState=1511138158; monitor_count=2"}
+    # 将your cookie替换成自己的cookie
 
     # Weibo类初始化
     def __init__(self, user_id, filter=0):
