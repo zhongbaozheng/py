@@ -11,8 +11,8 @@ NEWSPIDER_MODULE = 'weibo.spiders'
 # 大V
 bigV = [
     1826792401
-    , 3937348351, 5548590926, 1896891963
-    # 1323527941, 1618051664, 1326410461, 2607072084, 2108172317,
+    , 3937348351, 5548590926, 1896891963,
+    1323527941, 1618051664, 1326410461, 2607072084, 2108172317,
 ]
 
 
@@ -37,11 +37,11 @@ bigV = [
 
 
 
-# 爬虫中间件注册
-DOWNLOADER_MIDDLEWARES = {
-    "weibo.middlewares.UserAgentMiddleware": 401,
-    "weibo.middlewares.CookiesMiddleware": 402,
-}
+# # 爬虫中间件注册
+# DOWNLOADER_MIDDLEWARES = {
+#     "weibo.middlewares.UserAgentMiddleware": 401,
+#     "weibo.middlewares.CookiesMiddleware": 402,
+# }
 
 
 # 爬虫管道注册
